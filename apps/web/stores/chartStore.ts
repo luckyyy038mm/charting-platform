@@ -1,5 +1,15 @@
 import { create } from 'zustand';
-import type { Candle, Timeframe } from '@charting-platform/market-types';
+
+type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w';
+
+interface Candle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
 /**
  * Chart UI State Store

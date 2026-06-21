@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useMarketWebSocket } from '@/hooks/useMarketWebSocket';
 import { ChartWorkspace } from '@/components/ChartWorkspace';
 import { TopToolbar } from '@/components/TopToolbar';

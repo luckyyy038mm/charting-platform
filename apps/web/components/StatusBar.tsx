@@ -1,7 +1,8 @@
 'use client';
 
 import { useMarketDataStore, useConnectionStore } from '@/stores/chartStore';
-import type { ConnectionStatus } from '@/stores/chartStore';
+
+type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 
 interface StatusBarProps {
   connectionStatus: ConnectionStatus;

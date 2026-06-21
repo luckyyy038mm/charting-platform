@@ -1,8 +1,6 @@
 'use client';
 
 import { useMarketDataStore, useChartModeStore } from '@/stores/chartStore';
-import { TIMEFRAMES, TIMEFRAME_LABELS } from '@charting-platform/shared-schema';
-import type { Timeframe } from '@charting-platform/market-types';
 
 export function TopToolbar() {
   const { symbol, timeframe, setSymbol, setTimeframe } = useMarketDataStore();
@@ -42,10 +40,10 @@ export function TopToolbar() {
 
       {/* Timeframe Selector */}
       <div className="flex items-center gap-1 bg-surface rounded p-0.5">
-        {TIMEFRAMES.slice(0, 6).map((tf) => (
+        {['1m', '5m', '15m', '1h', '4h', '1d'].map((tf) => (
           <button
             key={tf}
-            onClick={() => setTimeframe(tf)}
+            onClick={() => setTimeframe(tf as '1m' | '5m' | '15m' | '1h' | '4h' | '1d')}
             className={`px-2 py-1 text-xs rounded transition-colors ${
               timeframe === tf
                 ? 'bg-accent text-white'

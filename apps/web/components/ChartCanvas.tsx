@@ -2,11 +2,19 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { ChartController, ChartRenderer } from '@charting-platform/chart-engine';
-import type { Candle } from '@charting-platform/market-types';
+
+export interface Candle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
 interface ChartCanvasProps {
   candles: Candle[];
-  mode?: 'candlestick' | 'line' | 'area';
+  mode?: 'candlestick' | 'line' | 'area' | 'baseline';
   showVolume?: boolean;
   showPriceScale?: boolean;
   showTimeScale?: boolean;
@@ -191,11 +199,11 @@ function PriceScale({ candles }: { candles: Candle[] }) {
 
 function TimeScale({ candles }: { candles: Candle[] }) {
   if (candles.length === 0) return null;
-
+  
   // Show last N candles time labels
   const visibleCount = Math.min(6, candles.length);
   const startIndex = candles.length - visibleCount;
-
+  
   return (
     <div className="absolute bottom-0 left-0 right-20 h-6 bg-background-secondary/50 pointer-events-none flex items-center text-2xs font-mono text-text-muted">
       {candles.slice(startIndex).map((candle, i) => {

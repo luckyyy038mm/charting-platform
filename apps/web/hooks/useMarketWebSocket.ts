@@ -2,7 +2,34 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useConnectionStore, useMarketDataStore } from '@/stores/chartStore';
-import type { MarketEvent, KlineEvent, TradeEvent, Candle } from '@charting-platform/market-types';
+
+// Local type definitions for WebSocket messages
+interface KlineEvent {
+  open_time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  is_closed: boolean;
+}
+
+interface TradeEvent {
+  symbol: string;
+  price: number;
+  quantity: number;
+  time: number;
+  is_buyer_maker: boolean;
+}
+
+interface Candle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
 /**
  * WebSocket connection URL from environment

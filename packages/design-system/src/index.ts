@@ -1,11 +1,8 @@
 /**
  * Design System - UI Primitives
- * 
+ *
  * Reusable UI components for the charting platform.
  */
-
-// Re-export utilities
-export { default as clsx } from 'clsx';
 
 // Button variants
 export function getButtonClasses(variant: 'primary' | 'secondary' | 'ghost' | 'danger' = 'primary') {
