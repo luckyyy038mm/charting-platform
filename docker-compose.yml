@@ -1,0 +1,165 @@
+version: "3.9"
+
+services:
+  # =============================================================================
+  # Valkey - Cache, Pub/Sub, and Hot Data Store
+  # =============================================================================
+  valkey:
+    image: valkey/valkey:8.0-alpine
+    container_name: charting-platform-valkey
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./infra/docker/valkey/valkey.conf:/etc/valkey/valkey.conf:ro
+      - valkey-data:/data
+    command: valkey-server /etc/valkey/valkey.conf
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - charting-network
+
+  # =============================================================================
+  # PostgreSQL + TimescaleDB - Time Series and Platform Data
+  # =============================================================================
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: charting-platform-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: charting_platform
+      POSTGRES_USER: charting_user
+      POSTGRES_PASSWORD: charting_dev_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./infra/docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf:ro
+      - ./infra/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U charting_user -d charting_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - charting-network
+    profiles:
+      - database
+
+  # =============================================================================
+  # Go Platform API (Development Mode)
+  # =============================================================================
+  platform-api:
+    build:
+      context: .
+      dockerfile: apps/platform-api/Dockerfile
+    container_name: charting-platform-api
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: development
+      VALKEY_URL: redis://valkey:6379
+      POSTGRES_URL: postgresql://charting_user:charting_dev_password@postgres:5432/charting_platform
+      API_HOST: 0.0.0.0
+      API_PORT: 8080
+      API_LOG_LEVEL: info
+    depends_on:
+      valkey:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - charting-network
+    profiles:
+      - api
+    volumes:
+      - ./apps/platform-api:/app
+      - /app/vendor
+
+  # =============================================================================
+  # Rust Market Connector Service (Development Mode)
+  # =============================================================================
+  market-connector:
+    build:
+      context: .
+      dockerfile: services/connector-binance/Dockerfile
+    container_name: charting-platform-market-connector
+    environment:
+      VALKEY_URL: redis://valkey:6379
+      RUST_LOG_LEVEL: info
+      RUST_SERVICE_NAME: connector-binance
+      BINANCE_FUTURES_WS_URL: wss://stream.binance.com:9443/ws
+      BINANCE_FUTURES_REST_URL: https://fapi.binance.com
+    depends_on:
+      valkey:
+        condition: service_healthy
+    networks:
+      - charting-network
+    profiles:
+      - services
+    volumes:
+      - ./services/connector-binance:/app
+      - cargo-cache:/usr/local/cargo/registry
+
+  # =============================================================================
+  # Rust Market Core Service (Development Mode)
+  # =============================================================================
+  market-core:
+    build:
+      context: .
+      dockerfile: services/market-core/Dockerfile
+    container_name: charting-platform-market-core
+    environment:
+      VALKEY_URL: redis://valkey:6379
+      RUST_LOG_LEVEL: info
+      RUST_SERVICE_NAME: market-core
+    depends_on:
+      valkey:
+        condition: service_healthy
+    networks:
+      - charting-network
+    profiles:
+      - services
+    volumes:
+      - ./services/market-core:/app
+      - cargo-cache:/usr/local/cargo/registry
+
+  # =============================================================================
+  # Next.js Web Application (Development Mode)
+  # =============================================================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: charting-platform-web
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://platform-api:8080
+      NEXT_PUBLIC_WS_URL: ws://platform-api:8080
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    depends_on:
+      platform-api:
+        condition: service_started
+    networks:
+      - charting-network
+    profiles:
+      - web
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+
+networks:
+  charting-network:
+    driver: bridge
+
+volumes:
+  valkey-data:
+  postgres-data:
+  cargo-cache:

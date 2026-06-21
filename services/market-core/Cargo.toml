@@ -1,0 +1,34 @@
+[package]
+name = "market-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Market processing core - aggregation, analysis, and state management"
+
+[dependencies]
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Redis/VALKEY client
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Utilities
+parking_lot = "0.12"
+dashmap = "5.5"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[[bin]]
+name = "market-core"
+path = "src/main.rs"

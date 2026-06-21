@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0a0a0f;
+  --foreground: #e8e8ef;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #12121a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a3a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a4f;
+}
+
+/* Selection styling */
+::selection {
+  background: #6366f133;
+  color: #e8e8ef;
+}
+
+/* Focus outline */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Trading terminal specific styles */
+@layer components {
+  .btn-primary {
+    @apply bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded font-medium transition-colors;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-elevated hover:bg-background-hover text-text-primary px-4 py-2 rounded font-medium transition-colors border border-border;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-surface-elevated text-text-secondary hover:text-text-primary px-3 py-1.5 rounded transition-colors;
+  }
+
+  .input-field {
+    @apply bg-surface-secondary border border-border rounded px-3 py-2 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none transition-colors;
+  }
+
+  .card {
+    @apply bg-surface rounded-lg border border-border;
+  }
+
+  .panel {
+    @apply bg-background-secondary rounded-lg border border-border;
+  }
+
+  /* Price colors */
+  .price-bull {
+    @apply text-bull;
+  }
+
+  .price-bear {
+    @apply text-bear;
+  }
+
+  /* Status indicators */
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-dot-success {
+    @apply bg-status-success;
+  }
+
+  .status-dot-warning {
+    @apply bg-status-warning;
+  }
+
+  .status-dot-error {
+    @apply bg-status-error;
+  }
+}
+
+/* Chart canvas styling */
+.chart-canvas {
+  @apply w-full h-full;
+  touch-action: none;
+}
+
+/* WebGL canvas container */
+.webgl-container {
+  @apply absolute inset-0;
+}
+
+.webgl-container canvas {
+  @apply w-full h-full;
+}
