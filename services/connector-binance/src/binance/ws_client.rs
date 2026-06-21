@@ -3,14 +3,15 @@ use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, RwLock};
-use std::sync::atomic::{AtomicBool, Ordering};
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info, warn};
 
 use crate::events::{
-    DepthEvent, KlineEvent, MarketEvent, MarketEventType, TradeEvent, MarketStatusEvent,
+    DepthEvent, KlineEvent, MarketEvent, TradeEvent, MarketStatusEvent,
 };
 use crate::valkey::Publisher;
 
@@ -245,7 +246,7 @@ impl BinanceWsClient {
             }
             
             info!("Reconnecting in 5 seconds...");
-            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(5)).await;
         }
 
         Ok(())

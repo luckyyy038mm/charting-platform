@@ -22,8 +22,11 @@ redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 # HTTP client for REST API
 reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
 
-# WebSocket client
-tokio-tungstenite = { version = "0.21", features = ["__rustls-tls"] }
+# WebSocket client with native-tls (for system certificate support)
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+
+# Native TLS for certificate support
+native-tls = "0.2"
 
 # Time handling
 chrono = { version = "0.4", features = ["serde"] }
