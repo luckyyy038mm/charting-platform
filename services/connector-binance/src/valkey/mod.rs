@@ -81,6 +81,25 @@ impl Publisher {
         Ok(())
     }
 
+    /// Set a string key with optional expiration
+    pub async fn set_str(&self, key: &str, value: &str, expiration_secs: Option<u64>) -> Result<()> {
+        let mut conn = self.conn.write().await;
+        
+        match expiration_secs {
+            Some(secs) => {
+                conn.set_ex::<_, _, ()>(key, value, secs).await
+                    .context("Failed to set key with expiration")?;
+            }
+            None => {
+                conn.set::<_, _, ()>(key, value).await
+                    .context("Failed to set key")?;
+            }
+        }
+        
+        debug!(key = %key, "Set string key");
+        Ok(())
+    }
+
     /// Get a value by key
     pub async fn get<K, V>(&self, key: &str) -> Result<Option<V>>
     where

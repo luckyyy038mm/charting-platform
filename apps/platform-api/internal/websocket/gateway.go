@@ -9,7 +9,7 @@ import (
 
 	"github.com/charting-platform/platform-api/internal/market"
 	"github.com/charting-platform/platform-api/pkg/logger"
-	"github.com/gofiber/contrib/websocket"
+	ws "github.com/gofiber/contrib/websocket"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 // Client represents a WebSocket client connection
 type Client struct {
 	ID       string
-	Conn     *websocket.Conn
+	Conn     *ws.Conn
 	Channels map[string]bool
 	mu       sync.RWMutex
 }
@@ -66,7 +66,7 @@ func NewGateway(marketSvc *market.MarketService) *Gateway {
 }
 
 // HandleConnection handles a new WebSocket connection
-func (g *Gateway) HandleConnection(c *websocket.Conn) {
+func (g *Gateway) HandleConnection(c *ws.Conn) {
 	clientID := fmt.Sprintf("client_%d", time.Now().UnixNano())
 	
 	client := &Client{
@@ -227,7 +227,7 @@ func (g *Gateway) sendToClient(client *Client, resp WSResponse) {
 		return
 	}
 
-	if err := client.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+	if err := client.Conn.WriteMessage(ws.TextMessage, data); err != nil {
 		logger.Error().Err(err).Str("client_id", client.ID).Msg("Failed to write message")
 	}
 }
@@ -253,7 +253,7 @@ func (g *Gateway) Broadcast(resp WSResponse) {
 	defer g.mu.RUnlock()
 
 	for _, client := range g.clients {
-		if err := client.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		if err := client.Conn.WriteMessage(ws.TextMessage, data); err != nil {
 			logger.Error().Err(err).Str("client_id", client.ID).Msg("Failed to broadcast to client")
 		}
 	}

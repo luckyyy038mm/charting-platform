@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
         _ => Level::INFO,
     };
 
-    let subscriber = FmtSubscriber::builder()
+    let _subscriber = FmtSubscriber::builder()
         .with_max_level(log_level)
         .with_target(false)
         .with_thread_ids(true)
@@ -48,8 +48,8 @@ async fn main() -> Result<()> {
     // Initialize Valkey publisher
     let publisher = Arc::new(Publisher::new(&config.valkey_url).await?);
 
-    // Initialize market state manager
-    let market_state = Arc::new(MarketStateManager::new());
+    // Initialize market state manager (placeholder for future use)
+    let _market_state = Arc::new(MarketStateManager::new());
 
     // Start heartbeat publisher
     let heartbeat_publisher = publisher.clone();
@@ -58,14 +58,15 @@ async fn main() -> Result<()> {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
         loop {
             interval.tick().await;
+            let heartbeat_data = serde_json::json!({
+                "service": service_name,
+                "status": "running",
+                "timestamp": chrono::Utc::now().timestamp_millis()
+            });
             if let Err(e) = heartbeat_publisher
-                .set(
+                .set_str(
                     &valkey::channels::heartbeat_key(&service_name),
-                    &serde_json::json!({
-                        "service": service_name,
-                        "status": "running",
-                        "timestamp": chrono::Utc::now().timestamp_millis()
-                    }),
+                    &heartbeat_data.to_string(),
                     Some(60),
                 )
                 .await

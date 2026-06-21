@@ -116,11 +116,11 @@ impl Default for OrderBookState {
 impl OrderBookState {
     pub fn update(&mut self, depth: DepthEvent) {
         // Update bids
-        for (price, qty) in depth.bids {
+        for &(price, qty) in &depth.bids {
             if qty == 0.0 {
                 self.bids.retain(|(p, _)| *p != price);
             } else {
-                if let Some(existing) = self.bids.iter_mut().find(|(p, _)| p == price) {
+                if let Some(existing) = self.bids.iter_mut().find(|(p, _)| *p == price) {
                     existing.1 = qty;
                 } else {
                     self.bids.push((price, qty));
@@ -129,11 +129,11 @@ impl OrderBookState {
         }
         
         // Update asks
-        for (price, qty) in depth.asks {
+        for &(price, qty) in &depth.asks {
             if qty == 0.0 {
                 self.asks.retain(|(p, _)| *p != price);
             } else {
-                if let Some(existing) = self.asks.iter_mut().find(|(p, _)| p == price) {
+                if let Some(existing) = self.asks.iter_mut().find(|(p, _)| *p == price) {
                     existing.1 = qty;
                 } else {
                     self.asks.push((price, qty));

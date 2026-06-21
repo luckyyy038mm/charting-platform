@@ -5,7 +5,15 @@
  * and coordinating the rendering pipeline.
  */
 
-import type { Candle } from '@charting-platform/shared-schema';
+// Candle type (duplicated to avoid workspace dependency issues)
+export interface Candle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+}
 
 export interface ChartConfig {
   width: number;

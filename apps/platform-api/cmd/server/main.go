@@ -1,20 +1,18 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/charting-platform/platform-api/internal/config"
 	"github.com/charting-platform/platform-api/internal/http"
 	"github.com/charting-platform/platform-api/internal/market"
 	"github.com/charting-platform/platform-api/internal/valkey"
+	ws "github.com/gofiber/contrib/websocket"
 	"github.com/charting-platform/platform-api/internal/websocket"
 	"github.com/charting-platform/platform-api/pkg/logger"
-	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -37,14 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to Valkey")
 	}
-
-	// Health check Valkey
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := valkeyClient.HealthCheck(ctx); err != nil {
-		log.Fatal().Err(err).Msg("Valkey health check failed")
-	}
-	log.Info().Msg("Connected to Valkey")
+	log.Info().Msg("Valkey client initialized")
 
 	// Initialize market service
 	marketService := market.NewMarketService(valkeyClient)
@@ -57,12 +48,12 @@ func main() {
 
 	// Mount WebSocket route
 	server.App().Use("/ws", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
+		if ws.IsWebSocketUpgrade(c) {
 			return c.Next()
 		}
 		return fiber.ErrUpgradeRequired
 	})
-	server.App().Get("/ws", websocket.New(wsGateway.HandleConnection))
+	server.App().Get("/ws", ws.New(wsGateway.HandleConnection))
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
@@ -79,11 +70,7 @@ func main() {
 	<-quit
 	log.Info().Msg("Shutting down server...")
 
-	// Shutdown with timeout
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := server.App().ShutdownWithContext(ctx); err != nil {
+	if err := server.App().Shutdown(); err != nil {
 		log.Error().Err(err).Msg("Server forced to shutdown")
 	}
 

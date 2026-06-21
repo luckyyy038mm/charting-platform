@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -14,7 +16,7 @@ type Server struct {
 
 // MarketServiceProvider interface for market service access
 type MarketServiceProvider interface {
-	GetSymbolSnapshot(ctx interface{}, symbol string) (map[string]interface{}, error)
+	GetSymbolSnapshot(ctx context.Context, symbol string) (map[string]interface{}, error)
 }
 
 // NewServer creates a new HTTP server

@@ -5,8 +5,17 @@
  * Uses a layered approach for different chart components.
  */
 
-import type { Candle } from '@charting-platform/shared-schema';
 import type { ChartController, VisibleRange } from './ChartController';
+
+// Candle type definition (duplicated here to avoid workspace dependency issues)
+export interface Candle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+}
 
 // Vertex shader for candlesticks
 const VERTEX_SHADER = `
@@ -36,15 +45,15 @@ const FRAGMENT_SHADER = `
 
 // Colors
 const COLORS = {
-  bull: [0.133, 0.773, 0.369, 1.0] as [number, number, number, number]; // #22c55e
-  bullBody: [0.086, 0.639, 0.290, 1.0] as [number, number, number, number];
-  bear: [0.937, 0.267, 0.267, 1.0] as [number, number, number, number]; // #ef4444
-  bearBody: [0.863, 0.149, 0.149, 1.0] as [number, number, number, number];
-  wick: [0.627, 0.627, 0.690, 1.0] as [number, number, number, number]; // #a0a0b0
-  grid: [0.165, 0.165, 0.227, 0.3] as [number, number, number, number]; // #2a2a3a
-  crosshair: [0.392, 0.392, 0.502, 0.8] as [number, number, number, number]; // #6366f1
-  volumeBull: [0.133, 0.773, 0.369, 0.4] as [number, number, number, number];
-  volumeBear: [0.937, 0.267, 0.267, 0.4] as [number, number, number, number];
+  bull: [0.133, 0.773, 0.369, 1.0],
+  bullBody: [0.086, 0.639, 0.290, 1.0],
+  bear: [0.937, 0.267, 0.267, 1.0],
+  bearBody: [0.863, 0.149, 0.149, 1.0],
+  wick: [0.627, 0.627, 0.690, 1.0],
+  grid: [0.165, 0.165, 0.227, 0.3],
+  crosshair: [0.392, 0.392, 0.502, 0.8],
+  volumeBull: [0.133, 0.773, 0.369, 0.4],
+  volumeBear: [0.937, 0.267, 0.267, 0.4],
 };
 
 export class ChartRenderer {

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info, warn};
 
@@ -159,6 +160,7 @@ pub struct BinanceWsClient {
     url: String,
     symbols: Vec<String>,
     publisher: Arc<Publisher>,
+    shutdown: Arc<AtomicBool>,
     shutdown_tx: broadcast::Sender<()>,
     state: Arc<RwLock<ClientState>>,
 }
@@ -177,6 +179,7 @@ impl BinanceWsClient {
             url: url.to_string(),
             symbols,
             publisher,
+            shutdown: Arc::new(AtomicBool::new(false)),
             shutdown_tx,
             state: Arc::new(RwLock::new(ClientState {
                 connected: false,
@@ -229,7 +232,7 @@ impl BinanceWsClient {
             }
 
             // Check for shutdown signal
-            if self.shutdown_tx.try_recv().is_ok() {
+            if self.shutdown.load(Ordering::Relaxed) {
                 info!("Shutdown signal received");
                 break;
             }
@@ -253,16 +256,21 @@ impl BinanceWsClient {
         &self,
         ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
     ) -> Result<()> {
-        let (mut write, mut read) = ws_stream.split();
+        let (write_tx, mut write_rx) = tokio::sync::mpsc::channel::<Message>(100);
+        let write_tx_for_ping = write_tx.clone();
+        // split() returns (SplitSink, SplitStream) - (write, read)
+        let (mut ws_write, mut ws_read) = ws_stream.split();
 
         // Send ping periodically
         let ping_handle = tokio::spawn({
-            let mut shutdown = self.shutdown_tx.subscribe();
+            let shutdown_rx = self.shutdown_tx.subscribe();
+            let shutdown_flag = self.shutdown.clone();
             async move {
+                let mut shutdown = shutdown_rx;
                 loop {
                     tokio::select! {
                         _ = tokio::time::sleep(tokio::time::Duration::from_secs(30)) => {
-                            if write.send(Message::Ping(vec![].into())).await.is_err() {
+                            if write_tx_for_ping.send(Message::Ping(vec![].into())).await.is_err() {
                                 break;
                             }
                         }
@@ -270,12 +278,25 @@ impl BinanceWsClient {
                             break;
                         }
                     }
+                    // Also check atomic flag as backup
+                    if shutdown_flag.load(Ordering::Relaxed) {
+                        break;
+                    }
+                }
+            }
+        });
+
+        // Write messages (pings and pongs)
+        let write_handle = tokio::spawn(async move {
+            while let Some(msg) = write_rx.recv().await {
+                if ws_write.send(msg).await.is_err() {
+                    break;
                 }
             }
         });
 
         // Process incoming messages
-        while let Some(msg) = read.next().await {
+        while let Some(msg) = ws_read.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
                     if let Err(e) = self.process_message(&text).await {
@@ -283,7 +304,7 @@ impl BinanceWsClient {
                     }
                 }
                 Ok(Message::Ping(data)) => {
-                    let _ = write.send(Message::Pong(data)).await;
+                    let _ = write_tx.send(Message::Pong(data)).await;
                 }
                 Ok(Message::Close(_)) => {
                     warn!("WebSocket closed by server");
@@ -298,6 +319,7 @@ impl BinanceWsClient {
         }
 
         let _ = ping_handle.abort();
+        let _ = write_handle.abort();
         Ok(())
     }
 
@@ -496,6 +518,7 @@ impl BinanceWsClient {
 
     /// Stop the WebSocket client
     pub fn stop(&self) {
+        self.shutdown.store(true, Ordering::Relaxed);
         let _ = self.shutdown_tx.send(());
     }
 }
