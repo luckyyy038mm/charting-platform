@@ -21,131 +21,125 @@ export function ChartCanvas({ candles }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const { showPriceScale, showTimeScale } = useChartUIStore();
-  const [webglSupported, setWebglSupported] = useState(true);
+  const [isWebGL, setIsWebGL] = useState<boolean | null>(null);
 
-  // Check WebGL support
+  // Check WebGL support on mount
   useEffect(() => {
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    setWebglSupported(!!gl);
+    setIsWebGL(!!gl);
   }, []);
 
-  // Canvas rendering (fallback when WebGL is not available)
-  useEffect(() => {
-    if (!canvasRef.current || !containerRef.current) return;
-    if (webglSupported) return; // Let WebGL handle it if available
-
+  // Render function for Canvas 2D
+  const renderCanvas2D = useCallback(() => {
     const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const render = () => {
-      const container = containerRef.current;
-      if (!container) return;
+    const rect = container.getBoundingClientRect();
+    
+    // Set canvas size with device pixel ratio
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+    ctx.scale(dpr, dpr);
 
-      const rect = container.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+    // Clear
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, rect.width, rect.height);
 
-      // Clear
-      ctx.fillStyle = '#0a0a0f';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (candles.length === 0) {
+      ctx.fillStyle = '#666';
+      ctx.font = '14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Loading chart...', rect.width / 2, rect.height / 2);
+      return;
+    }
 
-      if (candles.length === 0) {
-        ctx.fillStyle = '#888';
-        ctx.font = '14px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('Loading chart...', canvas.width / 2, canvas.height / 2);
-        return;
-      }
+    // Calculate visible candles
+    const padding = { top: 20, right: 80, bottom: 30, left: 10 };
+    const volumeHeight = 80;
+    const chartWidth = rect.width - padding.left - padding.right;
+    const chartHeight = rect.height - padding.top - padding.bottom - volumeHeight;
 
-      // Calculate visible candles
-      const padding = { top: 20, right: 80, bottom: 30, left: 10 };
-      const volumeHeight = 80;
-      const chartWidth = canvas.width - padding.left - padding.right;
-      const chartHeight = canvas.height - padding.top - padding.bottom - volumeHeight;
+    const visibleCount = Math.min(candles.length, Math.floor(chartWidth / 12));
+    const startIndex = Math.max(0, candles.length - visibleCount);
+    const visibleCandles = candles.slice(startIndex);
 
-      const visibleCount = Math.min(candles.length, Math.floor(chartWidth / 12));
-      const startIndex = Math.max(0, candles.length - visibleCount);
-      const visibleCandles = candles.slice(startIndex);
+    // Calculate price range
+    let minPrice = Infinity, maxPrice = -Infinity;
+    let maxVolume = 0;
+    for (const c of visibleCandles) {
+      minPrice = Math.min(minPrice, c.low);
+      maxPrice = Math.max(maxPrice, c.high);
+      maxVolume = Math.max(maxVolume, c.volume);
+    }
+    const priceRange = maxPrice - minPrice || 1;
 
-      // Calculate price range
-      let minPrice = Infinity, maxPrice = -Infinity;
-      let maxVolume = 0;
-      for (const c of visibleCandles) {
-        minPrice = Math.min(minPrice, c.low);
-        maxPrice = Math.max(maxPrice, c.high);
-        maxVolume = Math.max(maxVolume, c.volume);
-      }
-      const priceRange = maxPrice - minPrice || 1;
+    // Draw grid
+    ctx.strokeStyle = 'rgba(42, 42, 58, 0.5)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++) {
+      const y = padding.top + (i / 5) * chartHeight;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(padding.left + chartWidth, y);
+      ctx.stroke();
+    }
 
-      // Draw grid
-      ctx.strokeStyle = 'rgba(42, 42, 58, 0.5)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i <= 5; i++) {
-        const y = padding.top + (i / 5) * chartHeight;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, y);
-        ctx.lineTo(padding.left + chartWidth, y);
-        ctx.stroke();
-      }
-
-      // Draw candles
-      const candleWidth = chartWidth / visibleCandles.length;
-      for (let i = 0; i < visibleCandles.length; i++) {
-        const c = visibleCandles[i];
-        const x = padding.left + (i + 0.5) * candleWidth;
-        
-        const yHigh = padding.top + chartHeight - ((c.high - minPrice) / priceRange) * chartHeight;
-        const yLow = padding.top + chartHeight - ((c.low - minPrice) / priceRange) * chartHeight;
-        const yOpen = padding.top + chartHeight - ((c.open - minPrice) / priceRange) * chartHeight;
-        const yClose = padding.top + chartHeight - ((c.close - minPrice) / priceRange) * chartHeight;
-        
-        const isBullish = c.close >= c.open;
-        ctx.strokeStyle = isBullish ? '#22c55e' : '#ef4444';
-        ctx.fillStyle = isBullish ? '#16a34a' : '#dc2626';
-        
-        // Wick
-        ctx.beginPath();
-        ctx.moveTo(x, yHigh);
-        ctx.lineTo(x, yLow);
-        ctx.stroke();
-        
-        // Body
-        const bodyTop = Math.min(yOpen, yClose);
-        const bodyHeight = Math.max(1, Math.abs(yClose - yOpen));
-        ctx.fillRect(x - candleWidth * 0.4, bodyTop, candleWidth * 0.8, bodyHeight);
-        
-        // Volume
-        const barHeight = maxVolume > 0 ? (c.volume / maxVolume) * (volumeHeight - 10) : 0;
-        const yVol = canvas.height - padding.bottom - barHeight;
-        ctx.fillStyle = isBullish ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)';
-        ctx.fillRect(x - candleWidth * 0.4, yVol, candleWidth * 0.8, barHeight);
-      }
-    };
-
-    render();
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [candles, webglSupported]);
+    // Draw candles
+    const candleWidth = Math.max(2, chartWidth / visibleCandles.length);
+    for (let i = 0; i < visibleCandles.length; i++) {
+      const c = visibleCandles[i];
+      const x = padding.left + (i + 0.5) * (chartWidth / visibleCandles.length);
+      
+      const yHigh = padding.top + chartHeight - ((c.high - minPrice) / priceRange) * chartHeight;
+      const yLow = padding.top + chartHeight - ((c.low - minPrice) / priceRange) * chartHeight;
+      const yOpen = padding.top + chartHeight - ((c.open - minPrice) / priceRange) * chartHeight;
+      const yClose = padding.top + chartHeight - ((c.close - minPrice) / priceRange) * chartHeight;
+      
+      const isBullish = c.close >= c.open;
+      ctx.strokeStyle = isBullish ? '#22c55e' : '#ef4444';
+      ctx.fillStyle = isBullish ? '#16a34a' : '#dc2626';
+      
+      // Wick
+      ctx.beginPath();
+      ctx.moveTo(x, yHigh);
+      ctx.lineTo(x, yLow);
+      ctx.stroke();
+      
+      // Body
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyHeight = Math.max(1, Math.abs(yClose - yOpen));
+      ctx.fillRect(x - candleWidth * 0.4, bodyTop, candleWidth * 0.8, bodyHeight);
+      
+      // Volume
+      const barHeight = maxVolume > 0 ? (c.volume / maxVolume) * (volumeHeight - 10) : 0;
+      const yVol = rect.height - padding.bottom - barHeight;
+      ctx.fillStyle = isBullish ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)';
+      ctx.fillRect(x - candleWidth * 0.4, yVol, candleWidth * 0.8, barHeight);
+    }
+  }, [candles]);
 
   // WebGL rendering (when supported)
   useEffect(() => {
+    if (isWebGL === null) return;
     if (!canvasRef.current || !containerRef.current) return;
-    if (!webglSupported) return;
+    if (!isWebGL) return; // Will use Canvas 2D fallback
 
-    // Dynamic import for WebGL chart engine
     import('@charting-platform/chart-engine').then(({ ChartController, ChartRenderer }) => {
       const canvas = canvasRef.current!;
       const container = containerRef.current!;
       
+      const dpr = window.devicePixelRatio || 1;
       const rect = container.getBoundingClientRect();
-      canvas.width = rect.width * window.devicePixelRatio;
-      canvas.height = rect.height * window.devicePixelRatio;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
 
@@ -157,10 +151,18 @@ export function ChartCanvas({ candles }: ChartCanvasProps) {
       const renderer = new ChartRenderer(canvas);
       renderer.resize(canvas.width, canvas.height);
 
+      const render = () => {
+        renderer.render(
+          controller.getCandles(),
+          controller.getVisibleRange(),
+          controller
+        );
+      };
+
       const handleResize = () => {
         const rect = container.getBoundingClientRect();
-        canvas.width = rect.width * window.devicePixelRatio;
-        canvas.height = rect.height * window.devicePixelRatio;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
         canvas.style.width = `${rect.width}px`;
         canvas.style.height = `${rect.height}px`;
         controller.setConfig({ width: canvas.width, height: canvas.height });
@@ -185,15 +187,15 @@ export function ChartCanvas({ candles }: ChartCanvasProps) {
 
       const handleMouseMove = (e: MouseEvent) => {
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * window.devicePixelRatio;
-        const y = (e.clientY - rect.top) * window.devicePixelRatio;
+        const x = (e.clientX - rect.left) * dpr;
+        const y = (e.clientY - rect.top) * dpr;
         
         renderer.setCrosshair(x, y, true);
         render();
         
         if (isDragging) {
-          const deltaX = (e.clientX - lastX) / window.devicePixelRatio;
-          controller.pan(deltaX);
+          const deltaX = (e.clientX - lastX);
+          controller.pan(deltaX / dpr);
           lastX = e.clientX;
         }
       };
@@ -230,17 +232,31 @@ export function ChartCanvas({ candles }: ChartCanvasProps) {
         unsubscribe();
       };
     }).catch(err => {
-      console.error('Failed to load chart engine:', err);
-      setWebglSupported(false);
+      console.error('WebGL chart engine failed, using Canvas 2D:', err);
+      setIsWebGL(false);
     });
-  }, [webglSupported]);
+  }, [isWebGL, candles]);
 
-  // Update candles
+  // Use Canvas 2D when WebGL is not available
   useEffect(() => {
-    if (webglSupported) {
-      // Handled in WebGL effect
-    }
-  }, [candles, webglSupported]);
+    if (isWebGL === null) return;
+    if (isWebGL) return; // Using WebGL
+
+    renderCanvas2D();
+
+    // Re-render on resize
+    const handleResize = () => renderCanvas2D();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isWebGL, renderCanvas2D]);
+
+  // Re-render candles when they change
+  useEffect(() => {
+    if (isWebGL === null) return;
+    if (isWebGL) return; // WebGL handles this internally
+    
+    renderCanvas2D();
+  }, [candles, isWebGL, renderCanvas2D]);
 
   return (
     <div ref={containerRef} className="w-full h-full relative">
@@ -249,8 +265,8 @@ export function ChartCanvas({ candles }: ChartCanvasProps) {
         className="absolute inset-0 w-full h-full"
         style={{ cursor: 'crosshair' }}
       />
-      {showPriceScale && webglSupported && <PriceScale candles={candles} />}
-      {showTimeScale && webglSupported && <TimeScale candles={candles} />}
+      {!isWebGL && showPriceScale && <PriceScale candles={candles} />}
+      {!isWebGL && showTimeScale && <TimeScale candles={candles} />}
     </div>
   );
 }
