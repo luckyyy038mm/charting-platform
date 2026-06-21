@@ -75,7 +75,7 @@ export function StatusBar({ connectionStatus }: StatusBarProps) {
 
       {/* Version */}
       <div className="text-text-muted">
-        v0.1.0
+        v0.2.0
       </div>
     </footer>
   );

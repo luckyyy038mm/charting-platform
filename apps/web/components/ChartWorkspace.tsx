@@ -1,24 +1,15 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
-import { useMarketDataStore, useChartUIStore, useChartModeStore } from '@/stores/chartStore';
+import { useMarketDataStore } from '@/stores/chartStore';
 import { ChartCanvas } from './ChartCanvas';
 
 export function ChartWorkspace() {
-  const { candles, symbol, timeframe, isLoading, error } = useMarketDataStore();
-  const { showVolume, showPriceScale, showTimeScale } = useChartUIStore();
-  const { mode } = useChartModeStore();
+  const { candles, timeframe, isLoading, error } = useMarketDataStore();
 
   return (
     <div className="flex-1 flex flex-col bg-background min-h-0">
       {/* Chart Header */}
       <div className="h-8 flex items-center px-4 border-b border-border bg-background-secondary">
-        <span className="text-sm text-text-primary font-medium">
-          {symbol}
-        </span>
-        <span className="text-xs text-text-muted ml-2">
-          {timeframe.toUpperCase()}
-        </span>
         <div className="flex-1" />
         {candles.length > 0 && (
           <div className="flex items-center gap-4 text-xs">
@@ -50,17 +41,13 @@ export function ChartWorkspace() {
               <span className="text-4xl text-text-muted">📊</span>
               <span className="text-sm text-text-secondary">No chart data loaded</span>
               <span className="text-xs text-text-muted">
-                Connect to {symbol} market data to see live candles
+                Loading historical candles...
               </span>
             </div>
           </div>
         ) : (
           <ChartCanvas
             candles={candles}
-            mode={mode}
-            showVolume={showVolume}
-            showPriceScale={showPriceScale}
-            showTimeScale={showTimeScale}
           />
         )}
       </div>

@@ -9,3 +9,4 @@ export { ChartController } from './core/ChartController';
 export type { ChartConfig, ViewState, VisibleRange } from './core/ChartController';
 
 export { ChartRenderer } from './core/ChartRenderer';
+export type { CrosshairState, Candle } from './core/ChartRenderer';

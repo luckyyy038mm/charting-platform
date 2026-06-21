@@ -2,13 +2,34 @@ import { create } from 'zustand';
 
 type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w';
 
-interface Candle {
+export interface Candle {
   time: number;
   open: number;
   high: number;
   low: number;
   close: number;
   volume: number;
+}
+
+export interface Trade {
+  id: number;
+  price: number;
+  quantity: number;
+  time: number;
+  isBuyerMaker: boolean;
+}
+
+export interface OrderBookLevel {
+  price: number;
+  quantity: number;
+}
+
+export interface OrderBook {
+  bestBid: number;
+  bestAsk: number;
+  spread: number;
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
 }
 
 /**
@@ -80,6 +101,12 @@ interface MarketDataState {
   candles: Candle[];
   lastUpdate: number;
   
+  // Trades data
+  trades: Trade[];
+  
+  // Order book data
+  orderBook: OrderBook | null;
+  
   // Loading and error states
   isLoading: boolean;
   error: string | null;
@@ -90,6 +117,9 @@ interface MarketDataState {
   setCandles: (candles: Candle[]) => void;
   addCandle: (candle: Candle) => void;
   updateLastCandle: (candle: Candle) => void;
+  setTrades: (trades: Trade[]) => void;
+  addTrade: (trade: Trade) => void;
+  setOrderBook: (orderBook: OrderBook) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 }
@@ -100,11 +130,13 @@ export const useMarketDataStore = create<MarketDataState>((set) => ({
   timeframe: '1m',
   candles: [],
   lastUpdate: 0,
+  trades: [],
+  orderBook: null,
   isLoading: false,
   error: null,
   
   // Actions
-  setSymbol: (symbol) => set({ symbol, candles: [], lastUpdate: 0 }),
+  setSymbol: (symbol) => set({ symbol, candles: [], lastUpdate: 0, trades: [] }),
   setTimeframe: (timeframe) => set({ timeframe, candles: [], lastUpdate: 0 }),
   setCandles: (candles) => set({ candles, lastUpdate: Date.now(), error: null }),
   addCandle: (candle) => set((state) => ({
@@ -118,6 +150,11 @@ export const useMarketDataStore = create<MarketDataState>((set) => ({
     }
     return { candles, lastUpdate: Date.now() };
   }),
+  setTrades: (trades) => set({ trades }),
+  addTrade: (trade) => set((state) => ({
+    trades: [trade, ...state.trades].slice(0, 50),
+  })),
+  setOrderBook: (orderBook) => set({ orderBook }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error, isLoading: false }),
 }));
@@ -137,17 +174,14 @@ interface ChartModeState {
   
   // Actions
   setMode: (mode: ChartMode) => void;
-  // Future: setFootprintConfig, setHeatmapConfig
 }
 
 interface FootprintConfig {
-  // Placeholder for footprint chart configuration
   aggregationType: 'delta' | 'volume' | 'trade_count';
   levels: number;
 }
 
 interface HeatmapConfig {
-  // Placeholder for heatmap configuration
   metric: 'volume' | 'liquidity' | 'delta';
   levels: number;
 }

@@ -262,7 +262,7 @@ cd services/market-core && cargo test
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1 | ✅ Complete | Foundation, infrastructure, basic data flow |
-| Phase 2 | 🔜 Next | Order book, Time & Sales, historical data |
+| Phase 2 | ✅ Complete | Live candles, historical data, trades, order book |
 | Phase 3 | 📋 Planned | Footprint charts, heatmap |
 | Phase 4 | 📋 Planned | Replay mode, paper trading |
 

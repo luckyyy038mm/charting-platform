@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { ChartController, ChartRenderer } from '@charting-platform/chart-engine';
+import { useChartUIStore } from '@/stores/chartStore';
 
 export interface Candle {
   time: number;
@@ -14,24 +15,15 @@ export interface Candle {
 
 interface ChartCanvasProps {
   candles: Candle[];
-  mode?: 'candlestick' | 'line' | 'area' | 'baseline';
-  showVolume?: boolean;
-  showPriceScale?: boolean;
-  showTimeScale?: boolean;
 }
 
-export function ChartCanvas({
-  candles,
-  mode = 'candlestick',
-  showVolume = true,
-  showPriceScale = true,
-  showTimeScale = true,
-}: ChartCanvasProps) {
+export function ChartCanvas({ candles }: ChartCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<ChartController | null>(null);
   const rendererRef = useRef<ChartRenderer | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const { showPriceScale, showTimeScale } = useChartUIStore();
 
   // Initialize controller and renderer
   useEffect(() => {
@@ -78,7 +70,7 @@ export function ChartCanvas({
       controller.zoomAt(factor, e.offsetX);
     };
 
-    // Handle mouse down for pan
+    // Handle mouse for pan and crosshair
     let isDragging = false;
     let lastX = 0;
 
@@ -89,10 +81,28 @@ export function ChartCanvas({
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      const deltaX = (e.clientX - lastX) / window.devicePixelRatio;
-      controller.pan(deltaX);
-      lastX = e.clientX;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * window.devicePixelRatio;
+      const y = (e.clientY - rect.top) * window.devicePixelRatio;
+      
+      // Update crosshair
+      if (rendererRef.current) {
+        rendererRef.current.setCrosshair(x, y, true);
+        render();
+      }
+      
+      if (isDragging) {
+        const deltaX = (e.clientX - lastX) / window.devicePixelRatio;
+        controller.pan(deltaX);
+        lastX = e.clientX;
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (rendererRef.current) {
+        rendererRef.current.setCrosshair(0, 0, false);
+        render();
+      }
     };
 
     const handleMouseUp = () => {
@@ -109,7 +119,8 @@ export function ChartCanvas({
     window.addEventListener('resize', handleResize);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     canvas.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseleave', handleMouseLeave);
     window.addEventListener('mouseup', handleMouseUp);
 
     // Initial render
@@ -121,7 +132,8 @@ export function ChartCanvas({
       window.removeEventListener('resize', handleResize);
       canvas.removeEventListener('wheel', handleWheel);
       canvas.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseleave', handleMouseLeave);
       window.removeEventListener('mouseup', handleMouseUp);
       unsubscribe();
       if (animationFrameRef.current) {

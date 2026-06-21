@@ -220,6 +220,44 @@ func (g *Gateway) forwardMarketEvents(client *Client) {
 	}
 }
 
+// SubscribeToSymbol subscribes a client to a specific symbol's market events
+func (g *Gateway) SubscribeToSymbol(clientID string, symbol string) {
+	g.mu.RLock()
+	client, exists := g.clients[clientID]
+	g.mu.RUnlock()
+
+	if !exists {
+		return
+	}
+
+	client.mu.Lock()
+	client.Channels[symbol] = true
+	client.mu.Unlock()
+
+	g.mu.Lock()
+	g.subscriptions[clientID][symbol] = true
+	g.mu.Unlock()
+}
+
+// UnsubscribeFromSymbol unsubscribes a client from a specific symbol
+func (g *Gateway) UnsubscribeFromSymbol(clientID string, symbol string) {
+	g.mu.RLock()
+	client, exists := g.clients[clientID]
+	g.mu.RUnlock()
+
+	if !exists {
+		return
+	}
+
+	client.mu.Lock()
+	delete(client.Channels, symbol)
+	client.mu.Unlock()
+
+	g.mu.Lock()
+	delete(g.subscriptions[clientID], symbol)
+	g.mu.Unlock()
+}
+
 func (g *Gateway) sendToClient(client *Client, resp WSResponse) {
 	data, err := json.Marshal(resp)
 	if err != nil {

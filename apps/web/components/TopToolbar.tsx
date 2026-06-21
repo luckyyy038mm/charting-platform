@@ -6,12 +6,13 @@ export function TopToolbar() {
   const { symbol, timeframe, setSymbol, setTimeframe } = useMarketDataStore();
   const { mode, setMode } = useChartModeStore();
 
-  const symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT'];
+  const symbols = ['BTCUSDT', 'ETHUSDT'];
+  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'] as const;
   const modes = [
     { id: 'candlestick', label: 'Candles' },
     { id: 'line', label: 'Line' },
     { id: 'area', label: 'Area' },
-  ];
+  ] as const;
 
   return (
     <header className="h-12 bg-background-secondary border-b border-border flex items-center px-4 gap-6">
@@ -40,10 +41,10 @@ export function TopToolbar() {
 
       {/* Timeframe Selector */}
       <div className="flex items-center gap-1 bg-surface rounded p-0.5">
-        {['1m', '5m', '15m', '1h', '4h', '1d'].map((tf) => (
+        {timeframes.map((tf) => (
           <button
             key={tf}
-            onClick={() => setTimeframe(tf as '1m' | '5m' | '15m' | '1h' | '4h' | '1d')}
+            onClick={() => setTimeframe(tf)}
             className={`px-2 py-1 text-xs rounded transition-colors ${
               timeframe === tf
                 ? 'bg-accent text-white'
@@ -60,7 +61,7 @@ export function TopToolbar() {
         {modes.map((m) => (
           <button
             key={m.id}
-            onClick={() => setMode(m.id as 'candlestick' | 'line' | 'area')}
+            onClick={() => setMode(m.id)}
             className={`px-3 py-1.5 text-xs rounded transition-colors ${
               mode === m.id
                 ? 'bg-surface-elevated text-text-primary border border-border'
@@ -77,10 +78,10 @@ export function TopToolbar() {
 
       {/* Right Side Actions */}
       <div className="flex items-center gap-2">
-        <button className="btn-ghost text-xs">
+        <button className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors">
           Settings
         </button>
-        <button className="btn-ghost text-xs">
+        <button className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors">
           Help
         </button>
       </div>

@@ -17,6 +17,13 @@ export interface Candle {
   volume?: number;
 }
 
+// Crosshair state interface
+export interface CrosshairState {
+  x: number;
+  y: number;
+  visible: boolean;
+}
+
 // Vertex shader for candlesticks
 const VERTEX_SHADER = `
   attribute vec2 a_position;
@@ -52,6 +59,7 @@ const COLORS = {
   wick: [0.627, 0.627, 0.690, 1.0],
   grid: [0.165, 0.165, 0.227, 0.3],
   crosshair: [0.392, 0.392, 0.502, 0.8],
+  crosshairLabel: [0.039, 0.039, 0.059, 0.9],
   volumeBull: [0.133, 0.773, 0.369, 0.4],
   volumeBear: [0.937, 0.267, 0.267, 0.4],
 };
@@ -73,6 +81,9 @@ export class ChartRenderer {
   private candleGap: number = 2;
   private volumeHeight: number = 80;
   private padding = { top: 20, right: 80, bottom: 30, left: 10 };
+
+  // Crosshair state
+  private crosshair: CrosshairState = { x: 0, y: 0, visible: false };
 
   constructor(canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl', {
@@ -154,6 +165,20 @@ export class ChartRenderer {
   }
 
   /**
+   * Set crosshair position
+   */
+  setCrosshair(x: number, y: number, visible: boolean) {
+    this.crosshair = { x, y, visible };
+  }
+
+  /**
+   * Get crosshair state
+   */
+  getCrosshair(): CrosshairState {
+    return this.crosshair;
+  }
+
+  /**
    * Render the chart
    */
   render(
@@ -177,6 +202,11 @@ export class ChartRenderer {
     
     // Render volume
     this.renderVolume(candles, visibleRange);
+    
+    // Render crosshair
+    if (this.crosshair.visible) {
+      this.renderCrosshair(visibleRange);
+    }
     
     // Flush to GPU
     this.flush();
@@ -210,18 +240,23 @@ export class ChartRenderer {
     // Vertical time grid lines
     const timeSteps = 6;
     const visibleCount = visibleRange.endIndex - visibleRange.startIndex;
-    const timeStep = Math.ceil(visibleCount / timeSteps);
-    
-    for (let i = 0; i <= timeSteps; i++) {
-      const index = visibleRange.startIndex + i * timeStep;
-      const x = this.padding.left + ((index - visibleRange.startIndex) / visibleCount) * chartWidth;
+    if (visibleCount > 0) {
+      const timeStep = Math.ceil(visibleCount / timeSteps);
       
-      this.addLine(
-        x,
-        this.padding.top,
-        x,
-        this.padding.top + chartHeight
-      , COLORS.grid);
+      for (let i = 0; i <= timeSteps; i++) {
+        const index = visibleRange.startIndex + i * timeStep;
+        if (index < visibleRange.startIndex || index >= visibleRange.endIndex) continue;
+        
+        const x = this.padding.left + ((index - visibleRange.startIndex) / visibleCount) * chartWidth;
+        
+        this.addLine(
+          x,
+          this.padding.top,
+          x,
+          this.padding.top + chartHeight,
+          COLORS.grid
+        );
+      }
     }
   }
 
@@ -285,13 +320,62 @@ export class ChartRenderer {
 
       const x = this.padding.left + ((i - visibleRange.startIndex) + 0.5) * candleStep;
       const halfWidth = (this.candleWidth / 2) * 0.8;
-      const barHeight = (candle.volume / maxVolume) * (this.volumeHeight - 10);
+      const barHeight = maxVolume > 0 ? (candle.volume / maxVolume) * (this.volumeHeight - 10) : 0;
       const y = this.height - this.padding.bottom - barHeight;
 
       const isBullish = candle.close >= candle.open;
       const color = isBullish ? COLORS.volumeBull : COLORS.volumeBear;
 
       this.addRect(x - halfWidth, y, halfWidth * 2, barHeight, color);
+    }
+  }
+
+  /**
+   * Render crosshair
+   */
+  private renderCrosshair(visibleRange: VisibleRange) {
+    const chartHeight = this.height - this.padding.top - this.padding.bottom - this.volumeHeight;
+    const chartWidth = this.width - this.padding.left - this.padding.right;
+    
+    const { x, y } = this.crosshair;
+    
+    // Clamp crosshair to chart area
+    const clampedX = Math.max(this.padding.left, Math.min(x, this.padding.left + chartWidth));
+    const clampedY = Math.max(this.padding.top, Math.min(y, this.padding.top + chartHeight));
+    
+    // Vertical line
+    this.addLine(clampedX, this.padding.top, clampedX, this.padding.top + chartHeight, COLORS.crosshair);
+    
+    // Horizontal line
+    this.addLine(this.padding.left, clampedY, this.padding.left + chartWidth, clampedY, COLORS.crosshair);
+    
+    // Price label background
+    const priceY = clampedY - 10;
+    const labelWidth = 60;
+    const labelHeight = 20;
+    this.addRect(
+      this.padding.left + chartWidth - labelWidth - 5,
+      Math.max(this.padding.top, priceY - labelHeight / 2),
+      labelWidth,
+      labelHeight,
+      COLORS.crosshairLabel
+    );
+    
+    // Calculate price at crosshair
+    const priceRange = visibleRange.priceMax - visibleRange.priceMin;
+    const priceAtCrosshair = visibleRange.priceMax - ((clampedY - this.padding.top) / chartHeight) * priceRange;
+    
+    // Time label background
+    const timeX = clampedX - labelWidth / 2;
+    const timeY = this.padding.top + chartHeight + 5;
+    if (clampedX >= this.padding.left && clampedX <= this.padding.left + chartWidth) {
+      this.addRect(
+        Math.max(this.padding.left, timeX),
+        timeY,
+        labelWidth,
+        labelHeight,
+        COLORS.crosshairLabel
+      );
     }
   }
 

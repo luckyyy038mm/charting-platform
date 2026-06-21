@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useConnectionStore, useMarketDataStore } from '@/stores/chartStore';
+import { useConnectionStore, useMarketDataStore, Candle } from '@/stores/chartStore';
 
-// Local type definitions for WebSocket messages
-interface KlineEvent {
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws';
+const RECONNECT_DELAY = 3000;
+const MAX_RECONNECT_ATTEMPTS = 10;
+
+interface KlineData {
   open_time: number;
   open: number;
   high: number;
@@ -14,42 +17,14 @@ interface KlineEvent {
   is_closed: boolean;
 }
 
-interface TradeEvent {
-  symbol: string;
-  price: number;
-  quantity: number;
-  time: number;
-  is_buyer_maker: boolean;
+interface WSMessage {
+  type: string;
+  channel?: string;
+  symbol?: string;
+  data?: unknown;
 }
 
-interface Candle {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
-
-/**
- * WebSocket connection URL from environment
- */
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws';
-
-/**
- * Reconnection delay in milliseconds
- */
-const RECONNECT_DELAY = 3000;
-
-/**
- * Maximum reconnection attempts
- */
-const MAX_RECONNECT_ATTEMPTS = 10;
-
-/**
- * Hook for managing WebSocket connection to the market data service
- */
-export function useMarketWebSocket() {
+export function useMarketWebSocket(onKlineUpdate?: (kline: KlineData) => void, onTradeUpdate?: (trade: { trade_id: string; price: number; quantity: number; time: number; is_buyer_maker: boolean }) => void) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -61,18 +36,15 @@ export function useMarketWebSocket() {
     addSubscription,
   } = useConnectionStore();
   
-  const { symbol, timeframe, updateLastCandle, addCandle } = useMarketDataStore();
+  const { symbol, updateLastCandle, addCandle, addTrade } = useMarketDataStore();
 
-  /**
-   * Handle incoming WebSocket messages
-   */
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
-      const message = JSON.parse(event.data);
+      const message: WSMessage = JSON.parse(event.data);
       
       switch (message.type) {
         case 'connected':
-          console.log('WebSocket connected:', message.data);
+          console.log('WebSocket connected');
           setStatus('connected');
           resetReconnectAttempts();
           break;
@@ -85,11 +57,26 @@ export function useMarketWebSocket() {
           break;
           
         case 'kline':
-          handleKlineEvent(message.data as KlineEvent);
+          if (onKlineUpdate && message.data) {
+            const kline = message.data as KlineData;
+            onKlineUpdate(kline);
+          }
           break;
           
         case 'trade':
-          handleTradeEvent(message.data as TradeEvent);
+          if (message.data) {
+            const trade = message.data as { trade_id: string; price: number; quantity: number; time: number; is_buyer_maker: boolean };
+            if (onTradeUpdate) {
+              onTradeUpdate(trade);
+            }
+            addTrade({
+              id: parseInt(trade.trade_id) || Date.now(),
+              price: trade.price,
+              quantity: trade.quantity,
+              time: trade.time,
+              isBuyerMaker: trade.is_buyer_maker,
+            });
+          }
           break;
           
         case 'pong':
@@ -102,39 +89,8 @@ export function useMarketWebSocket() {
     } catch (error) {
       console.error('Failed to parse WebSocket message:', error);
     }
-  }, [setStatus, resetReconnectAttempts, addSubscription]);
+  }, [setStatus, resetReconnectAttempts, addSubscription, onKlineUpdate, onTradeUpdate, addTrade]);
 
-  /**
-   * Handle kline events
-   */
-  const handleKlineEvent = useCallback((kline: KlineEvent) => {
-    const candle: Candle = {
-      time: kline.open_time,
-      open: kline.open,
-      high: kline.high,
-      low: kline.low,
-      close: kline.close,
-      volume: kline.volume,
-    };
-
-    if (kline.is_closed) {
-      addCandle(candle);
-    } else {
-      updateLastCandle(candle);
-    }
-  }, [addCandle, updateLastCandle]);
-
-  /**
-   * Handle trade events
-   */
-  const handleTradeEvent = useCallback((_trade: TradeEvent) => {
-    // Trade events can be used for time & sales, tape, etc.
-    // Future: aggregate and display
-  }, []);
-
-  /**
-   * Connect to WebSocket server
-   */
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
@@ -177,9 +133,6 @@ export function useMarketWebSocket() {
     }
   }, [setStatus, resetReconnectAttempts, handleMessage]);
 
-  /**
-   * Schedule reconnection attempt
-   */
   const scheduleReconnect = useCallback(() => {
     const { reconnectAttempts } = useConnectionStore.getState();
     
@@ -194,11 +147,8 @@ export function useMarketWebSocket() {
     reconnectTimeoutRef.current = setTimeout(() => {
       connect();
     }, RECONNECT_DELAY);
-  }, [connect, incrementReconnectAttempts]);
+  }, [connect, incrementReconnectAttempts, setStatus]);
 
-  /**
-   * Disconnect from WebSocket server
-   */
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -213,9 +163,6 @@ export function useMarketWebSocket() {
     setStatus('disconnected');
   }, [setStatus]);
 
-  /**
-   * Subscribe to market data for a symbol
-   */
   const subscribe = useCallback((sym: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket not connected, cannot subscribe');
@@ -229,9 +176,6 @@ export function useMarketWebSocket() {
     }));
   }, []);
 
-  /**
-   * Unsubscribe from market data for a symbol
-   */
   const unsubscribe = useCallback((sym: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) {
       return;
@@ -244,9 +188,6 @@ export function useMarketWebSocket() {
     }));
   }, []);
 
-  /**
-   * Send ping to server
-   */
   const ping = useCallback(() => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) {
       return;
@@ -257,29 +198,21 @@ export function useMarketWebSocket() {
     }));
   }, []);
 
-  // Auto-connect and subscribe on mount
+  // Auto-connect on mount
   useEffect(() => {
     connect();
     
-    // Subscribe to current symbol
-    const unsubscribeFromStore = useConnectionStore.subscribe((state) => {
-      if (state.status === 'connected' && !state.subscribedSymbols.includes(symbol)) {
-        subscribe(symbol);
-      }
-    });
-
     return () => {
-      unsubscribeFromStore();
       disconnect();
     };
   }, []);
 
-  // Re-subscribe when symbol changes
+  // Subscribe when symbol changes
   useEffect(() => {
     if (status === 'connected') {
       subscribe(symbol);
     }
-  }, [symbol, timeframe, status, subscribe]);
+  }, [symbol, status, subscribe]);
 
   // Periodic ping
   useEffect(() => {
